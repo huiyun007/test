@@ -1,757 +1,674 @@
-<!DOCTYPE html>
-<html lang="zh-Hant">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>長者運動大富翁</title>
-    <!-- 引入 Tailwind CSS CDN (用於樣式設計) -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- 引入 React/ReactDOM CDN (用於建立元件) -->
-    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-    <!-- 引入 Babel 才能編譯 JSX (在瀏覽器中運行 React) -->
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <!-- 修正: 移除 lucide-react，改用 lucide 核心函式庫來手動創建 SVG 元件 -->
-    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
-    <style>
-        /* 使用 Inter 字體以保持現代感 */
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
-        body {
-            font-family: 'Inter', sans-serif;
-            /* 讓內容在移動設備上佔滿高度，避免在主體捲動 */
-            height: 100vh;
-            overflow: hidden; 
-        }
-        /* 定義棋盤的 Grid 結構 */
-        .board-grid {
-            grid-template-columns: repeat(6, minmax(0, 1fr));
-            grid-template-rows: repeat(6, minmax(0, 1fr));
-        }
-    </style>
-</head>
-<body>
-    <!-- React 應用程式的根節點 -->
-    <div id="root"></div>
+import React, { useState, useEffect } from 'react';
+import { 
+  Trophy, 
+  Users, 
+  Dices, 
+  Activity, 
+  Brain, 
+  Heart, 
+  Star, 
+  CheckCircle,
+  XCircle,
+  RotateCcw,
+  Play,
+  Swords, 
+  Flame   
+} from 'lucide-react';
 
-    <script type="text/babel">
-        // ----------------------------------------------------------------
-        // 1. 引入 Lucide icons 和 React Hooks (已修正為手動 SVG 轉換)
-        // ----------------------------------------------------------------
+/**
+ * 長者運動大富翁 (題庫調整版)
+ * 已根據指定內容更新所有任務與分數
+ */
+
+// --- 遊戲資料設定 ---
+
+const TILE_TYPES = {
+  START: { label: '起點', color: 'bg-green-600', icon: <Star className="w-8 h-8 md:w-10 md:h-10 text-white" /> },
+  EXERCISE: { label: '動動手腳', color: 'bg-orange-500', icon: <Activity className="w-8 h-8 md:w-10 md:h-10 text-white" /> },
+  QUIZ: { label: '健康腦力', color: 'bg-blue-500', icon: <Brain className="w-8 h-8 md:w-10 md:h-10 text-white" /> },
+  SOCIAL: { label: '歡樂互動', color: 'bg-pink-500', icon: <Users className="w-8 h-8 md:w-10 md:h-10 text-white" /> },
+  CHANCE: { label: '機會命運', color: 'bg-purple-500', icon: <Trophy className="w-8 h-8 md:w-10 md:h-10 text-white" /> },
+  REST: { label: '喝水休息', color: 'bg-teal-500', icon: <Heart className="w-8 h-8 md:w-10 md:h-10 text-white" /> },
+  ATTACK: { label: '攻擊卡', color: 'bg-red-600', icon: <Swords className="w-8 h-8 md:w-10 md:h-10 text-white" /> },
+};
+
+// --- 更新後的題庫資料庫 ---
+const TASK_DATABASE = {
+  // 💪 EXERCISE：動動手腳 (運動類)
+  EXERCISE: [
+    { text: "雙手向上舉高，深呼吸三次", points: 20 },
+    { text: "原地踏步 30 秒", points: 30 },
+    { text: "雙手向前伸直，手掌開合 10 次", points: 20 },
+    { text: "轉動肩膀，向前 5 圈，向後 5 圈", points: 20 },
+    { text: "坐姿抬膝蓋，左右各 5 次", points: 30 },
+    { text: "雙手插腰，身體左右輕輕轉動", points: 20 },
+    { text: "模仿「游蛙式」的動作 5 次", points: 25 },
+    { text: "雙手比「讚」，向前伸展手臂", points: 15 },
+  ],
+  // 🧠 QUIZ：健康腦力 (問答類)
+  QUIZ: [
+    { text: "請問一天建議喝多少水？ (1) 500cc (2) 2000cc", answer: "答案：(2) 2000cc", points: 20 },
+    { text: "運動前要做什麼事可以預防受傷？", answer: "答案：暖身運動", points: 20 },
+    { text: "預防跌倒，家裡地板應該保持？(1) 濕滑 (2) 乾燥", answer: "答案：(2) 乾燥", points: 15 },
+    { text: "心情不好時，找朋友聊天有幫助嗎？", answer: "答案：非常有幫助！", points: 15 },
+    { text: "這句成語接龍：「身體...」", answer: "答案：身體健康", points: 30 },
+  ],
+  // 🤝 SOCIAL：歡樂互動 (社交類)
+  SOCIAL: [
+    { text: "全隊一起對隔壁隊伍比個「愛心」手勢", points: 30 },
+    { text: "請全隊一起大笑三聲「哈！哈！哈！」", points: 25 },
+    { text: "幫你右邊的夥伴搥搥背", points: 30 },
+    { text: "全隊一起大喊：「我們最健康！」", points: 20 },
+    { text: "與另一隊的一位代表握手或擊掌", points: 25 },
+    { text: "全隊一起唱兩句大家都會的歌 (如: 甜蜜蜜)", points: 50 },
+  ],
+  // 🏆 CHANCE：機會命運 (運氣類)
+  CHANCE: [
+    { text: "恭喜！直接獲得加分！", points: 50 },
+    { text: "太棒了！全體隊員起立接受掌聲", points: 30 },
+    { text: "休息是為了走更長的路，暫停一回合 (但也加 10 分)", points: 10 },
+    { text: "骰子點數加倍送分！", points: 40 },
+  ],
+  // ⚔️ ATTACK：攻擊卡 (互動/扣分類)
+  ATTACK: [
+    { text: "發動攻擊！下一順位的隊伍扣 10 分！", points: -10, effect: 'NEXT' },
+    { text: "太強了！目前最高分的隊伍扣 20 分！", points: -20, effect: 'LEADER' },
+    { text: "全體攻擊！除了我們以外，其他隊伍各扣 5 分！", points: -5, effect: 'OTHERS' },
+    { text: "踩到香蕉皮！自己扣 10 分...", points: -10, effect: 'SELF' },
+    { text: "指定攻擊：請老師幫忙扣上一隊 15 分！", points: -15, effect: 'PREV' },
+  ]
+};
+
+// 地圖生成 (20格)
+const generateBoard = () => {
+  const board = [];
+  // 確保各種類型都有出現
+  const types = [
+    'EXERCISE', 'ATTACK', 'SOCIAL', 'EXERCISE', 
+    'CHANCE', 'EXERCISE', 'ATTACK', 'QUIZ', 
+    'EXERCISE', 'REST', 'SOCIAL', 'EXERCISE', 
+    'QUIZ', 'ATTACK', 'SOCIAL', 'EXERCISE', 
+    'QUIZ', 'CHANCE', 'EXERCISE'
+  ];
+  
+  board.push({ id: 0, type: 'START', ...TILE_TYPES.START });
+  types.forEach((type, index) => {
+    board.push({ id: index + 1, type, ...TILE_TYPES[type] });
+  });
+  return board;
+};
+
+const BOARD_DATA = generateBoard();
+
+// 座標計算 (維持正方形回字型)
+const getGridPosition = (index) => {
+  if (index >= 0 && index <= 5) return { row: 6, col: index + 1 };
+  if (index >= 6 && index <= 10) return { row: 6 - (index - 5), col: 6 };
+  if (index >= 11 && index <= 15) return { row: 1, col: 6 - (index - 10) };
+  if (index >= 16 && index <= 19) return { row: 1 + (index - 15), col: 1 };
+  return { row: 1, col: 1 };
+};
+
+const TEAM_COLORS = [
+  { name: '紅隊', bg: 'bg-red-600', text: 'text-red-700', border: 'border-red-600', ring: 'ring-red-300', placeholder: '例如: 紅隊' },
+  { name: '藍隊', bg: 'bg-blue-700', text: 'text-blue-700', border: 'border-blue-700', ring: 'ring-blue-300', placeholder: '例如: 藍隊' },
+  { name: '黃隊', bg: 'bg-yellow-500', text: 'text-yellow-700', border: 'border-yellow-500', ring: 'ring-yellow-300', placeholder: '例如: 黃隊' },
+  { name: '綠隊', bg: 'bg-green-600', text: 'text-green-700', border: 'border-green-600', ring: 'ring-green-300', placeholder: '例如: 綠隊' },
+];
+
+export default function ElderMonopoly() {
+  const [gameState, setGameState] = useState('SETUP');
+  const [teams, setTeams] = useState([]);
+  const [currentTeamIndex, setCurrentTeamIndex] = useState(0);
+  const [diceNumber, setDiceNumber] = useState(1);
+  const [isRolling, setIsRolling] = useState(false);
+  const [currentTask, setCurrentTask] = useState(null);
+  const [showConfetti, setShowConfetti] = useState(false);
+  const [confettiText, setConfettiText] = useState('加分！🎉');
+  const [setupTeamCount, setSetupTeamCount] = useState(2);
+  const [customTeamNames, setCustomTeamNames] = useState(TEAM_COLORS.map(t => t.name));
+
+  const playSound = (type) => {
+    try {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContext) return;
+      const ctx = new AudioContext();
+      const osc = ctx.createOscillator();
+      const gainNode = ctx.createGain();
+      osc.connect(gainNode);
+      gainNode.connect(ctx.destination);
+      const now = ctx.currentTime;
+
+      if (type === 'success' || type === 'levelup') {
+        osc.type = 'triangle'; 
+        gainNode.gain.setValueAtTime(0.3, now);
+        osc.frequency.setValueAtTime(523.25, now);       
+        osc.frequency.setValueAtTime(659.25, now + 0.1); 
+        osc.frequency.setValueAtTime(783.99, now + 0.2); 
+        osc.frequency.setValueAtTime(1046.50, now + 0.3);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.8);
+        osc.start(now);
+        osc.stop(now + 0.8);
+      } else if (type === 'attack') {
+        osc.type = 'sawtooth';
+        gainNode.gain.setValueAtTime(0.4, now);
+        osc.frequency.setValueAtTime(150, now);
+        osc.frequency.exponentialRampToValueAtTime(50, now + 0.3);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+        osc.start(now);
+        osc.stop(now + 0.4);
+      } else if (type === 'tick') {
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(600, now);
+        osc.frequency.exponentialRampToValueAtTime(200, now + 0.05);
+        gainNode.gain.setValueAtTime(0.1, now);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+        osc.start(now);
+        osc.stop(now + 0.05);
+      }
+    } catch (e) {
+      console.error("Audio play failed", e);
+    }
+  };
+
+  const handleTeamNameChange = (index, value) => {
+    const newNames = [...customTeamNames];
+    newNames[index] = value;
+    setCustomTeamNames(newNames);
+  };
+
+  const startGame = () => {
+    const newTeams = Array.from({ length: setupTeamCount }, (_, i) => ({
+      id: i,
+      name: customTeamNames[i] || TEAM_COLORS[i].name, 
+      color: TEAM_COLORS[i],
+      position: 0,
+      score: 0,
+      laps: 0 
+    }));
+    setTeams(newTeams);
+    setGameState('PLAYING');
+  };
+
+  const rollDice = () => {
+    if (isRolling) return;
+    setIsRolling(true);
+    let counter = 0;
+    const interval = setInterval(() => {
+      playSound('tick');
+      setDiceNumber(Math.floor(Math.random() * 6) + 1);
+      counter++;
+      if (counter > 15) {
+        clearInterval(interval);
+        const finalDice = Math.floor(Math.random() * 6) + 1;
+        setDiceNumber(finalDice);
+        setIsRolling(false);
+        movePlayer(finalDice);
+      }
+    }, 100);
+  };
+
+  const movePlayer = (steps) => {
+    // 取得當前隊伍的起始位置 (注意：這裡使用的是擲骰子當下的 teams 狀態)
+    const startTeam = teams[currentTeamIndex];
+    let stepsRemaining = steps;
+
+    // 使用 setInterval 來製作「一步一步走」的動畫
+    const stepInterval = setInterval(() => {
+      setTeams(prevTeams => {
+        const newTeams = [...prevTeams];
+        const team = { ...newTeams[currentTeamIndex] };
         
-        // 取得 Lucide 核心圖示資料
-        const Lucide = window.lucide || { icons: {} }; 
-        const { useState, useEffect, useCallback } = React;
+        // 移動一步
+        team.position += 1;
         
-        // 輔助函式：將 Lucide 圖示名稱轉換為可用的 React Component
-        const createIconComponent = (name) => {
-            const iconData = Lucide.icons[name];
-            if (!iconData) {
-                // 如果圖示未找到，返回一個簡單的問號佔位符
-                return ({ className = '', size = 24 }) => <span className={className} style={{fontSize: `${size}px`}}>❓</span>;
-            }
+        // 處理經過起點 (Wrap around)
+        if (team.position >= BOARD_DATA.length) {
+          team.position = 0;
+          team.score += 50; 
+          team.laps += 1;
+          playSound('levelup');
+          setConfettiText('通過起點 +50！');
+          setShowConfetti(true);
+          // 2秒後自動關閉慶祝動畫，避免擋住視線
+          setTimeout(() => setShowConfetti(false), 2000);
+        } else {
+           playSound('tick'); // 每走一步都有音效
+        }
+        
+        newTeams[currentTeamIndex] = team;
+        return newTeams;
+      });
 
-            // 使用 SVG 內容作為 React Component
-            const IconComponent = ({ className = '', size = 24 }) => (
-                <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width={size}
-                    height={size}
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className={className}
-                    dangerouslySetInnerHTML={{ __html: iconData.contents.join('') }}
-                />
-            );
-            return IconComponent;
-        };
+      stepsRemaining--;
 
-        // 定義所有需要的圖示元件
-        const Trophy = createIconComponent('trophy');
-        const Users = createIconComponent('users');
-        const Activity = createIconComponent('activity');
-        const Brain = createIconComponent('brain');
-        const Heart = createIconComponent('heart');
-        const Star = createIconComponent('star');
-        const CheckCircle = createIconComponent('check-circle');
-        const XCircle = createIconComponent('x-circle');
-        const RotateCcw = createIconComponent('rotate-ccw');
-        const Play = createIconComponent('play');
-        const Swords = createIconComponent('swords');
-        const Flame = createIconComponent('flame');
+      // 檢查是否走完了
+      if (stepsRemaining <= 0) {
+        clearInterval(stepInterval);
+        
+        // 計算最終位置以觸發事件 (確保數值正確)
+        let finalPos = startTeam.position + steps;
+        // 處理多圈的情況來計算正確的格子索引
+        while (finalPos >= BOARD_DATA.length) {
+             finalPos -= BOARD_DATA.length;
+        }
 
-        // ----------------------------------------------------------------
-        // 2. 遊戲資料設定 (與原 React 檔案相同)
-        // ----------------------------------------------------------------
+        // 稍微延遲後再觸發格子任務
+        setTimeout(() => {
+           // 確保關閉可能還在顯示的過起點動畫
+           setShowConfetti(false);
+           
+           // 觸發格子事件
+           triggerTileEvent(BOARD_DATA[finalPos], startTeam);
+        }, 500);
+      }
+    }, 400); // 每 0.4 秒走一步，速度適中
+  };
 
-        const TILE_TYPES = {
-            START: { label: '起點', color: 'bg-green-600', icon: Star },
-            EXERCISE: { label: '動動手腳', color: 'bg-orange-500', icon: Activity },
-            QUIZ: { label: '健康腦力', color: 'bg-blue-500', icon: Brain },
-            SOCIAL: { label: '歡樂互動', color: 'bg-pink-500', icon: Users },
-            CHANCE: { label: '機會命運', color: 'bg-purple-500', icon: Trophy },
-            REST: { label: '喝水休息', color: 'bg-teal-500', icon: Heart },
-            ATTACK: { label: '攻擊卡', color: 'bg-red-600', icon: Swords },
-        };
+  const triggerTileEvent = (tile, team) => {
+    setTimeout(() => {
+      if (tile.type === 'START') {
+         // 如果剛好停在起點，通常直接換下一位，或給予額外獎勵
+         // 這裡我們直接換下一位，因為過起點已經加過分了
+         nextTurn();
+      } else if (tile.type === 'REST') {
+         setCurrentTask({
+            type: 'REST',
+            title: '休息站',
+            content: '大家喝口水，深呼吸，休息一下！',
+            points: 10,
+            teamName: team.name
+        });
+        setGameState('MODAL');
+      } else {
+        const categoryTasks = TASK_DATABASE[tile.type] || TASK_DATABASE.EXERCISE;
+        const randomTask = categoryTasks[Math.floor(Math.random() * categoryTasks.length)];
+        
+        setCurrentTask({
+          type: tile.type,
+          title: TILE_TYPES[tile.type].label,
+          content: randomTask.text,
+          answer: randomTask.answer,
+          points: randomTask.points,
+          effect: randomTask.effect,
+          teamName: team.name,
+          teamColor: team.color
+        });
+        setGameState('MODAL');
+      }
+    }, 200); // 縮短一點延遲，因為走路動畫已經有停頓感
+  };
 
-        const TASK_DATABASE = {
-            // 💪 EXERCISE：動動手腳 (運動類)
-            EXERCISE: [
-                { text: "雙手向上舉高，深呼吸三次", points: 20 },
-                { text: "原地踏步 30 秒", points: 30 },
-                { text: "雙手向前伸直，手掌開合 10 次", points: 20 },
-                { text: "轉動肩膀，向前 5 圈，向後 5 圈", points: 20 },
-                { text: "坐姿抬膝蓋，左右各 5 次", points: 30 },
-                { text: "雙手插腰，身體左右輕輕轉動", points: 20 },
-                { text: "模仿「游蛙式」的動作 5 次", points: 25 },
-                { text: "雙手比「讚」，向前伸展手臂", points: 15 },
-            ],
-            // 🧠 QUIZ：健康腦力 (問答類)
-            QUIZ: [
-                { text: "請問一天建議喝多少水？ (1) 500cc (2) 2000cc", answer: "答案：(2) 2000cc", points: 20 },
-                { text: "運動前要做什麼事可以預防受傷？", answer: "答案：暖身運動", points: 20 },
-                { text: "預防跌倒，家裡地板應該保持？(1) 濕滑 (2) 乾燥", answer: "答案：(2) 乾燥", points: 15 },
-                { text: "心情不好時，找朋友聊天有幫助嗎？", answer: "答案：非常有幫助！", points: 15 },
-                { text: "這句成語接龍：「身體...」", answer: "答案：身體健康", points: 30 },
-            ],
-            // 🤝 SOCIAL：歡樂互動 (社交類)
-            SOCIAL: [
-                { text: "全隊一起對隔壁隊伍比個「愛心」手勢", points: 30 },
-                { text: "請全隊一起大笑三聲「哈！哈！哈！」", points: 25 },
-                { text: "幫你右邊的夥伴搥搥背", points: 30 },
-                { text: "全隊一起大喊：「我們最健康！」", points: 20 },
-                { text: "與另一隊的一位代表握手或擊掌", points: 25 },
-                { text: "全隊一起唱兩句大家都會的歌 (如: 甜蜜蜜)", points: 50 },
-            ],
-            // 🏆 CHANCE：機會命運 (運氣類)
-            CHANCE: [
-                { text: "恭喜！直接獲得加分！", points: 50 },
-                { text: "太棒了！全體隊員起立接受掌聲", points: 30 },
-                { text: "休息是為了走更長的路，暫停一回合 (但也加 10 分)", points: 10 },
-                { text: "骰子點數加倍送分！", points: 40 },
-            ],
-            // ⚔️ ATTACK：攻擊卡 (互動/扣分類)
-            ATTACK: [
-                { text: "發動攻擊！下一順位的隊伍扣 10 分！", points: -10, effect: 'NEXT' },
-                { text: "太強了！目前最高分的隊伍扣 20 分！", points: -20, effect: 'LEADER' },
-                { text: "全體攻擊！除了我們以外，其他隊伍各扣 5 分！", points: -5, effect: 'OTHERS' },
-                { text: "踩到香蕉皮！自己扣 10 分...", points: -10, effect: 'SELF' },
-                { text: "指定攻擊：請老師幫忙扣上一隊 15 分！", points: -15, effect: 'PREV' },
-            ]
-        };
+  // 執行任務與扣分邏輯
+  const completeTask = (success) => {
+    if (success) {
+      setTeams(prev => {
+        const newTeams = [...prev];
+        const currentTeam = newTeams[currentTeamIndex];
+        
+        // 處理特殊攻擊效果
+        if (currentTask.type === 'ATTACK' && currentTask.effect) {
+           let targetName = "";
+           playSound('attack');
 
-        // 地圖生成 (20格)
-        const generateBoard = () => {
-            const board = [];
-            const types = [
-                'EXERCISE', 'ATTACK', 'SOCIAL', 'EXERCISE', 
-                'CHANCE', 'EXERCISE', 'ATTACK', 'QUIZ', 
-                'EXERCISE', 'REST', 'SOCIAL', 'EXERCISE', 
-                'QUIZ', 'ATTACK', 'SOCIAL', 'EXERCISE', 
-                'QUIZ', 'CHANCE', 'EXERCISE'
-            ];
-            
-            board.push({ id: 0, type: 'START', ...TILE_TYPES.START });
-            types.forEach((type, index) => {
-                board.push({ id: index + 1, type, ...TILE_TYPES[type] });
-            });
-            return board;
-        };
+           switch (currentTask.effect) {
+             case 'NEXT': // 下一位
+               const nextIndex = (currentTeamIndex + 1) % newTeams.length;
+               newTeams[nextIndex].score += currentTask.points; 
+               targetName = newTeams[nextIndex].name;
+               break;
+             case 'PREV': // 上一位
+               const prevIndex = (currentTeamIndex - 1 + newTeams.length) % newTeams.length;
+               newTeams[prevIndex].score += currentTask.points;
+               targetName = newTeams[prevIndex].name;
+               break;
+             case 'LEADER': // 最高分 (排除自己)
+               let maxScore = -9999;
+               let leaderIndices = [];
+               newTeams.forEach((t, i) => {
+                 if (i !== currentTeamIndex) {
+                   if (t.score > maxScore) {
+                     maxScore = t.score;
+                     leaderIndices = [i];
+                   } else if (t.score === maxScore) {
+                     leaderIndices.push(i);
+                   }
+                 }
+               });
+               if (leaderIndices.length > 0) {
+                 const targetIdx = leaderIndices[Math.floor(Math.random() * leaderIndices.length)];
+                 newTeams[targetIdx].score += currentTask.points;
+                 targetName = newTeams[targetIdx].name;
+               } else {
+                 targetName = "無";
+               }
+               break;
+             case 'OTHERS': // 其他所有人
+               newTeams.forEach((t, i) => {
+                 if (i !== currentTeamIndex) {
+                   t.score += currentTask.points;
+                 }
+               });
+               targetName = "其他所有隊伍";
+               break;
+             case 'SELF': // 自己
+               currentTeam.score += currentTask.points;
+               targetName = "自己";
+               break;
+             default:
+               break;
+           }
 
-        const BOARD_DATA = generateBoard();
+           setConfettiText(`${targetName} 扣分！💥`);
+           setShowConfetti(true);
+           setTimeout(() => setShowConfetti(false), 2500);
 
-        // 座標計算 (維持正方形回字型)
-        const getGridPosition = (index) => {
-            if (index >= 0 && index <= 5) return { row: 6, col: index + 1 };
-            if (index >= 6 && index <= 10) return { row: 6 - (index - 5), col: 6 };
-            if (index >= 11 && index <= 15) return { row: 1, col: 6 - (index - 10) };
-            if (index >= 16 && index <= 19) return { row: 1 + (index - 15), col: 1 };
-            return { row: 1, col: 1 };
-        };
+        } else {
+          // 一般加分任務
+          currentTeam.score += currentTask.points;
+          playSound('success');
+          setConfettiText('好棒！加分！🎉');
+          setShowConfetti(true);
+          setTimeout(() => setShowConfetti(false), 2000);
+        }
 
-        const TEAM_COLORS = [
-            { name: '紅隊', bg: 'bg-red-600', text: 'text-red-700', border: 'border-red-600', ring: 'ring-red-300', placeholder: '例如: 紅隊' },
-            { name: '藍隊', bg: 'bg-blue-700', text: 'text-blue-700', border: 'border-blue-700', ring: 'ring-blue-300', placeholder: '例如: 藍隊' },
-            { name: '黃隊', bg: 'bg-yellow-500', text: 'text-yellow-700', border: 'border-yellow-500', ring: 'ring-yellow-300', placeholder: '例如: 黃隊' },
-            { name: '綠隊', bg: 'bg-green-600', text: 'text-green-700', border: 'border-green-600', ring: 'ring-green-300', placeholder: '例如: 綠隊' },
-        ];
+        return newTeams;
+      });
+    }
+    
+    setGameState('PLAYING');
+    setCurrentTask(null);
+    nextTurn();
+  };
 
+  const nextTurn = () => {
+    setCurrentTeamIndex((prev) => (prev + 1) % teams.length);
+  };
 
-        // ----------------------------------------------------------------
-        // 3. 主要 React 元件 (使用 Babel 編譯的 JSX)
-        // ----------------------------------------------------------------
+  const endGame = () => {
+    setGameState('FINISHED');
+    setConfettiText('遊戲結束！🏆');
+    setShowConfetti(true);
+  };
 
-        function ElderMonopoly() {
-            const [gameState, setGameState] = useState('SETUP');
-            const [teams, setTeams] = useState([]);
-            const [currentTeamIndex, setCurrentTeamIndex] = useState(0);
-            const [diceNumber, setDiceNumber] = useState(1);
-            const [isRolling, setIsRolling] = useState(false);
-            const [currentTask, setCurrentTask] = useState(null);
-            const [showConfetti, setShowConfetti] = useState(false);
-            const [confettiText, setConfettiText] = useState('加分！🎉');
-            const [setupTeamCount, setSetupTeamCount] = useState(2);
-            const [customTeamNames, setCustomTeamNames] = useState(TEAM_COLORS.map(t => t.name));
+  const resetGame = () => {
+    setGameState('SETUP');
+    setTeams([]);
+    setCurrentTeamIndex(0);
+    setShowConfetti(false);
+  };
 
-            // 音效函式
-            const playSound = (type) => {
-                try {
-                    const AudioContext = window.AudioContext || window.webkitAudioContext;
-                    if (!AudioContext) return;
-                    const ctx = new AudioContext();
-                    const osc = ctx.createOscillator();
-                    const gainNode = ctx.createGain();
-                    osc.connect(gainNode);
-                    gainNode.connect(ctx.destination);
-                    const now = ctx.currentTime;
+  // --- UI 元件 ---
 
-                    if (type === 'success' || type === 'levelup') {
-                        osc.type = 'triangle'; 
-                        gainNode.gain.setValueAtTime(0.3, now);
-                        osc.frequency.setValueAtTime(523.25, now);       
-                        osc.frequency.setValueAtTime(659.25, now + 0.1); 
-                        osc.frequency.setValueAtTime(783.99, now + 0.2); 
-                        osc.frequency.setValueAtTime(1046.50, now + 0.3);
-                        gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.8);
-                        osc.start(now);
-                        osc.stop(now + 0.8);
-                    } else if (type === 'attack') {
-                        osc.type = 'sawtooth';
-                        gainNode.gain.setValueAtTime(0.4, now);
-                        osc.frequency.setValueAtTime(150, now);
-                        osc.frequency.exponentialRampToValueAtTime(50, now + 0.3);
-                        gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
-                        osc.start(now);
-                        osc.stop(now + 0.4);
-                    } else if (type === 'tick') {
-                        osc.type = 'square';
-                        osc.frequency.setValueAtTime(600, now);
-                        osc.frequency.exponentialRampToValueAtTime(200, now + 0.05);
-                        gainNode.gain.setValueAtTime(0.1, now);
-                        gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
-                        osc.start(now);
-                        osc.stop(now + 0.05);
-                    }
-                } catch (e) {
-                    console.error("Audio play failed", e);
-                }
-            };
+  if (gameState === 'SETUP') {
+    return (
+      <div className="min-h-screen bg-yellow-50 flex flex-col items-center justify-center p-4 font-sans">
+        <div className="bg-white p-8 md:p-12 rounded-[3rem] shadow-2xl max-w-3xl w-full text-center border-8 border-orange-400">
+          <h1 className="text-6xl md:text-7xl font-black text-orange-600 mb-6 tracking-wider drop-shadow-sm">長者運動大富翁</h1>
+          
+          <div className="mb-8">
+            <h2 className="text-3xl md:text-4xl text-gray-700 font-bold mb-6">1. 請問今天有幾組參加？</h2>
+            <div className="flex justify-center gap-6">
+              {[2, 3, 4].map(num => (
+                <button
+                  key={num}
+                  onClick={() => setSetupTeamCount(num)}
+                  className={`w-20 h-20 md:w-24 md:h-24 rounded-full text-4xl font-black transition-all transform hover:scale-110 ${
+                    setupTeamCount === num 
+                    ? 'bg-orange-500 text-white shadow-xl ring-8 ring-orange-200' 
+                    : 'bg-gray-200 text-gray-500 hover:bg-gray-300'
+                  }`}
+                >
+                  {num}
+                </button>
+              ))}
+            </div>
+          </div>
 
-            const handleTeamNameChange = (index, value) => {
-                const newNames = [...customTeamNames];
-                newNames[index] = value;
-                setCustomTeamNames(newNames);
-            };
-
-            const startGame = () => {
-                const newTeams = Array.from({ length: setupTeamCount }, (_, i) => ({
-                    id: i,
-                    name: customTeamNames[i] || TEAM_COLORS[i].name, 
-                    color: TEAM_COLORS[i],
-                    position: 0,
-                    score: 0,
-                    laps: 0 
-                }));
-                setTeams(newTeams);
-                setGameState('PLAYING');
-            };
-
-            const nextTurn = useCallback(() => {
-                setCurrentTeamIndex((prev) => (prev + 1) % teams.length);
-            }, [teams.length]);
-
-
-            const triggerTileEvent = useCallback((tile, team) => {
-                setTimeout(() => {
-                    if (tile.type === 'START') {
-                        nextTurn();
-                    } else if (tile.type === 'REST') {
-                        setCurrentTask({
-                            type: 'REST',
-                            title: '休息站',
-                            content: '大家喝口水，深呼吸，休息一下！',
-                            points: 10,
-                            teamName: team.name
-                        });
-                        setGameState('MODAL');
-                    } else {
-                        const categoryTasks = TASK_DATABASE[tile.type] || TASK_DATABASE.EXERCISE;
-                        const randomTask = categoryTasks[Math.floor(Math.random() * categoryTasks.length)];
-                        
-                        setCurrentTask({
-                            type: tile.type,
-                            title: TILE_TYPES[tile.type].label,
-                            content: randomTask.text,
-                            answer: randomTask.answer,
-                            points: randomTask.points,
-                            effect: randomTask.effect,
-                            teamName: team.name,
-                            teamColor: team.color
-                        });
-                        setGameState('MODAL');
-                    }
-                }, 200);
-            }, [nextTurn]);
-
-            const movePlayer = useCallback((steps) => {
-                // 為了正確處理異步狀態更新中的動畫和最終位置計算，我們需要先獲取當前隊伍狀態
-                const startTeam = teams[currentTeamIndex];
-                let stepsRemaining = steps;
-                
-                const stepInterval = setInterval(() => {
-                    setTeams(prev => {
-                        const newTeams = [...prev];
-                        const team = { ...newTeams[currentTeamIndex] };
-                        
-                        // 移動一步
-                        team.position += 1;
-                        
-                        // 處理經過起點 (Wrap around)
-                        let passedStart = false;
-                        if (team.position >= BOARD_DATA.length) {
-                            team.position = 0;
-                            team.score += 50; 
-                            team.laps += 1;
-                            passedStart = true;
-                        }
-                        
-                        if (passedStart) {
-                            playSound('levelup');
-                            setConfettiText('通過起點 +50！');
-                            setShowConfetti(true);
-                            setTimeout(() => setShowConfetti(false), 2000);
-                        } else {
-                            playSound('tick'); 
-                        }
-                        
-                        newTeams[currentTeamIndex] = team;
-                        return newTeams;
-                    });
-
-                    stepsRemaining--;
-
-                    if (stepsRemaining <= 0) {
-                        clearInterval(stepInterval);
-                        
-                        // 計算最終位置
-                        let finalPos = startTeam.position + steps;
-                        while (finalPos >= BOARD_DATA.length) {
-                            finalPos -= BOARD_DATA.length;
-                        }
-
-                        // 觸發格子事件
-                        setTimeout(() => {
-                            setShowConfetti(false);
-                            triggerTileEvent(BOARD_DATA[finalPos], startTeam);
-                        }, 500);
-                    }
-                }, 400); // 每 0.4 秒走一步
-            }, [currentTeamIndex, teams, triggerTileEvent]);
-
-            const rollDice = () => {
-                if (isRolling) return;
-                setIsRolling(true);
-                let counter = 0;
-                const interval = setInterval(() => {
-                    playSound('tick');
-                    setDiceNumber(Math.floor(Math.random() * 6) + 1);
-                    counter++;
-                    if (counter > 15) {
-                        clearInterval(interval);
-                        const finalDice = Math.floor(Math.random() * 6) + 1;
-                        setDiceNumber(finalDice);
-                        setIsRolling(false);
-                        movePlayer(finalDice);
-                    }
-                }, 100);
-            };
-
-            // 執行任務與扣分邏輯
-            const completeTask = (success) => {
-                if (success) {
-                    setTeams(prev => {
-                        const newTeams = [...prev];
-                        const currentTeam = newTeams[currentTeamIndex];
-                        
-                        // 處理特殊攻擊效果
-                        if (currentTask.type === 'ATTACK' && currentTask.effect) {
-                            let targetName = "";
-                            playSound('attack');
-
-                            switch (currentTask.effect) {
-                                case 'NEXT': // 下一位
-                                    const nextIndex = (currentTeamIndex + 1) % newTeams.length;
-                                    newTeams[nextIndex].score += currentTask.points; 
-                                    targetName = newTeams[nextIndex].name;
-                                    break;
-                                case 'PREV': // 上一位
-                                    const prevIndex = (currentTeamIndex - 1 + newTeams.length) % newTeams.length;
-                                    newTeams[prevIndex].score += currentTask.points;
-                                    targetName = newTeams[prevIndex].name;
-                                    break;
-                                case 'LEADER': // 最高分 (排除自己)
-                                    let maxScore = -9999;
-                                    let leaderIndices = [];
-                                    newTeams.forEach((t, i) => {
-                                        if (i !== currentTeamIndex) {
-                                            if (t.score > maxScore) {
-                                                maxScore = t.score;
-                                                leaderIndices = [i];
-                                            } else if (t.score === maxScore) {
-                                                leaderIndices.push(i);
-                                            }
-                                        }
-                                    });
-                                    if (leaderIndices.length > 0) {
-                                        const targetIdx = leaderIndices[Math.floor(Math.random() * leaderIndices.length)];
-                                        newTeams[targetIdx].score += currentTask.points;
-                                        targetName = newTeams[targetIdx].name;
-                                    } else {
-                                        targetName = "無";
-                                    }
-                                    break;
-                                case 'OTHERS': // 其他所有人
-                                    newTeams.forEach((t, i) => {
-                                        if (i !== currentTeamIndex) {
-                                            t.score += currentTask.points;
-                                        }
-                                    });
-                                    targetName = "其他所有隊伍";
-                                    break;
-                                case 'SELF': // 自己
-                                    currentTeam.score += currentTask.points;
-                                    targetName = "自己";
-                                    break;
-                                default:
-                                    break;
-                            }
-
-                            setConfettiText(`${targetName} 扣分！💥`);
-                            setShowConfetti(true);
-                            setTimeout(() => setShowConfetti(false), 2500);
-
-                        } else {
-                            // 一般加分任務
-                            currentTeam.score += currentTask.points;
-                            playSound('success');
-                            setConfettiText('好棒！加分！🎉');
-                            setShowConfetti(true);
-                            setTimeout(() => setShowConfetti(false), 2000);
-                        }
-
-                        return newTeams;
-                    });
-                }
-                
-                setGameState('PLAYING');
-                setCurrentTask(null);
-                nextTurn();
-            };
-
-            const endGame = () => {
-                setGameState('FINISHED');
-                setConfettiText('遊戲結束！🏆');
-                setShowConfetti(true);
-            };
-
-            const resetGame = () => {
-                setGameState('SETUP');
-                setTeams([]);
-                setCurrentTeamIndex(0);
-                setShowConfetti(false);
-            };
-
-            const currentTeam = teams[currentTeamIndex] || {}; // 確保在 setup 階段 currentTeam 不為 null
-
-            // ----------------------------------------------------------------
-            // UI 元件 - 設定畫面
-            // ----------------------------------------------------------------
-            if (gameState === 'SETUP') {
-                return (
-                    <div className="min-h-screen bg-yellow-50 flex flex-col items-center justify-center p-4">
-                        <div className="bg-white p-8 md:p-12 rounded-[3rem] shadow-2xl max-w-3xl w-full text-center border-8 border-orange-400">
-                            <h1 className="text-6xl md:text-7xl font-black text-orange-600 mb-6 tracking-wider drop-shadow-sm">長者運動大富翁</h1>
-                            
-                            <div className="mb-8">
-                                <h2 className="text-3xl md:text-4xl text-gray-700 font-bold mb-6">1. 請問今天有幾組參加？</h2>
-                                <div className="flex justify-center gap-6">
-                                    {[2, 3, 4].map(num => (
-                                        <button
-                                            key={num}
-                                            onClick={() => setSetupTeamCount(num)}
-                                            className={`w-20 h-20 md:w-24 md:h-24 rounded-full text-4xl font-black transition-all transform hover:scale-110 ${
-                                                setupTeamCount === num 
-                                                ? 'bg-orange-500 text-white shadow-xl ring-8 ring-orange-200' 
-                                                : 'bg-gray-200 text-gray-500 hover:bg-gray-300'
-                                            }`}
-                                        >
-                                            {num}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            <div className="mb-10 bg-orange-50 p-6 rounded-3xl border-2 border-orange-100">
-                                <h2 className="text-2xl md:text-3xl text-gray-700 font-bold mb-4">2. 幫各組取個好聽的名字：</h2>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    {Array.from({ length: setupTeamCount }).map((_, index) => (
-                                        <div key={index} className="flex items-center gap-2">
-                                            <div className={`w-12 h-12 rounded-full border-4 border-white shadow-md flex items-center justify-center text-white font-bold text-xl shrink-0 ${TEAM_COLORS[index].bg}`}>
-                                                {index + 1}
-                                            </div>
-                                            <input 
-                                                type="text" 
-                                                value={customTeamNames[index]}
-                                                onChange={(e) => handleTeamNameChange(index, e.target.value)}
-                                                placeholder={TEAM_COLORS[index].placeholder}
-                                                className={`w-full text-2xl font-bold text-gray-700 p-3 rounded-xl border-4 outline-none focus:ring-4 transition-all ${TEAM_COLORS[index].border} focus:${TEAM_COLORS[index].ring}`}
-                                            />
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-
-                            <button 
-                                onClick={startGame}
-                                className="w-full bg-green-600 hover:bg-green-700 text-white text-4xl font-black py-8 px-8 rounded-3xl shadow-[0_8px_0_rgb(21,128,61)] active:shadow-none active:translate-y-2 transition-all flex items-center justify-center gap-6"
-                            >
-                                <Play className="w-12 h-12 fill-current" />
-                                開始遊戲
-                            </button>
+          <div className="mb-10 bg-orange-50 p-6 rounded-3xl border-2 border-orange-100">
+             <h2 className="text-2xl md:text-3xl text-gray-700 font-bold mb-4">2. 幫各組取個好聽的名字：</h2>
+             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {Array.from({ length: setupTeamCount }).map((_, index) => (
+                    <div key={index} className="flex items-center gap-2">
+                        <div className={`w-12 h-12 rounded-full border-4 border-white shadow-md flex items-center justify-center text-white font-bold text-xl shrink-0 ${TEAM_COLORS[index].bg}`}>
+                           {index + 1}
                         </div>
+                        <input 
+                           type="text" 
+                           value={customTeamNames[index]}
+                           onChange={(e) => handleTeamNameChange(index, e.target.value)}
+                           placeholder={TEAM_COLORS[index].placeholder}
+                           className={`w-full text-2xl font-bold text-gray-700 p-3 rounded-xl border-4 outline-none focus:ring-4 transition-all ${TEAM_COLORS[index].border} focus:${TEAM_COLORS[index].ring}`}
+                        />
                     </div>
-                );
-            }
+                ))}
+             </div>
+          </div>
 
-            // ----------------------------------------------------------------
-            // UI 元件 - 結束畫面
-            // ----------------------------------------------------------------
-            if (gameState === 'FINISHED') {
-                const sortedTeams = [...teams].sort((a, b) => b.score - a.score);
-                return (
-                    <div className="min-h-screen bg-yellow-100 flex flex-col items-center justify-center p-4">
-                        <div className="bg-white p-8 rounded-3xl shadow-2xl max-w-4xl w-full text-center">
-                            <h2 className="text-5xl font-black text-gray-800 mb-10">🏆 排行榜 🏆</h2>
-                            <div className="space-y-6 mb-12">
-                                {sortedTeams.map((team, index) => (
-                                    <div key={team.id} className={`flex items-center p-6 rounded-2xl border-4 ${index === 0 ? 'bg-yellow-50 border-yellow-400 scale-105 shadow-xl' : 'bg-white border-gray-200'}`}>
-                                        <div className={`w-20 h-20 rounded-full flex items-center justify-center text-4xl font-black text-white mr-6 ${index === 0 ? 'bg-yellow-400' : 'bg-gray-400'}`}>
-                                            {index + 1}
-                                        </div>
-                                        <div className="flex-1 text-left">
-                                            <div className={`text-4xl font-black ${team.color.text}`}>{team.name}</div>
-                                        </div>
-                                        <div className="text-6xl font-black text-gray-800">{team.score} <span className="text-3xl font-bold text-gray-500">分</span></div>
-                                    </div>
-                                ))}
-                            </div>
-                            <button 
-                                onClick={resetGame}
-                                className="bg-blue-600 text-white text-3xl font-bold py-6 px-16 rounded-full hover:bg-blue-700 shadow-xl"
-                            >
-                                再玩一次
-                            </button>
-                        </div>
-                    </div>
-                );
-            }
+          <button 
+            onClick={startGame}
+            className="w-full bg-green-600 hover:bg-green-700 text-white text-4xl font-black py-8 px-8 rounded-3xl shadow-[0_8px_0_rgb(21,128,61)] active:shadow-none active:translate-y-2 transition-all flex items-center justify-center gap-6"
+          >
+            <Play className="w-12 h-12 fill-current" />
+            開始遊戲
+          </button>
+        </div>
+      </div>
+    );
+  }
 
-            // ----------------------------------------------------------------
-            // UI 元件 - 遊戲主畫面
-            // ----------------------------------------------------------------
-
-            return (
-                <div className="h-screen w-screen bg-green-50 flex flex-col overflow-hidden select-none">
-                    
-                    {/* 頂部 */}
-                    <header className="bg-white shadow-md p-2 flex justify-between items-center z-20 h-24 shrink-0">
-                        <div className="flex items-center gap-4 pl-4">
-                            <Activity className="text-orange-600 w-12 h-12" />
-                            <h1 className="text-4xl font-black text-gray-800 tracking-wide hidden md:block">長者運動大富翁</h1>
-                        </div>
-                        <div className="flex gap-6 pr-4 items-center">
-                            {teams.map((team) => (
-                                <div key={team.id} className={`hidden md:flex flex-col items-center px-6 py-2 rounded-2xl border-4 ${team.color.bg} border-white shadow-md min-w-[140px]`}>
-                                    <span className="text-2xl text-white font-bold mb-1">{team.name}</span>
-                                    <span className="text-5xl font-black text-white leading-none drop-shadow-md">{team.score}</span>
-                                </div>
-                            ))}
-                            <button onClick={endGame} className="ml-2 px-8 py-4 bg-gray-200 rounded-full text-2xl text-gray-700 font-black hover:bg-gray-300 shadow-sm border-4 border-gray-300 transition-transform active:scale-95">
-                                結束
-                            </button>
-                        </div>
-                    </header>
-
-                    {/* 主畫面 */}
-                    <main className="flex-1 relative flex items-center justify-center bg-green-100/50 p-2 md:p-4 overflow-hidden">
-                        
-                        <div className="relative aspect-square h-full max-h-[calc(100vh-5rem)] w-auto board-grid gap-2 md:gap-3 p-3 bg-white rounded-[2rem] shadow-2xl border-8 border-green-200">
-                            
-                            {/* 中央控制區 */}
-                            <div className="col-start-2 col-span-4 row-start-2 row-span-4 bg-yellow-50/50 rounded-3xl flex flex-col items-center justify-center z-10 relative">
-                                
-                                <div className="flex flex-col items-center mb-3 md:mb-6 animate-in fade-in zoom-in duration-500">
-                                    <div className="text-lg md:text-2xl font-bold text-gray-500 mb-1">現在輪到</div>
-                                    <div className={`px-8 py-3 rounded-full text-4xl md:text-6xl font-black text-white shadow-lg tracking-widest ${currentTeam.color.bg} border-4 border-white`}>
-                                        {currentTeam.name}
-                                    </div>
-                                </div>
-
-                                <button 
-                                    onClick={rollDice}
-                                    disabled={isRolling}
-                                    className={`
-                                        relative group w-36 h-36 md:w-52 md:h-52 flex items-center justify-center rounded-[2rem] shadow-[0_12px_24px_rgba(0,0,0,0.15)] transition-all duration-200
-                                        ${isRolling ? 'bg-gray-100 cursor-not-allowed scale-95' : 'bg-white hover:scale-105 cursor-pointer hover:shadow-[0_16px_32px_rgba(0,0,0,0.2)]'}
-                                        border-4 md:border-8 border-orange-100
-                                    `}
-                                >
-                                    <div className={`
-                                        w-24 h-24 md:w-36 md:h-36 bg-white border-[4px] md:border-[6px] border-gray-800 rounded-2xl flex items-center justify-center shadow-inner
-                                        ${isRolling ? 'animate-spin' : ''}
-                                    `}>
-                                        <span className={`text-6xl md:text-8xl font-black ${isRolling ? 'text-gray-300 blur-sm' : 'text-gray-800'}`}>
-                                            {diceNumber}
-                                        </span>
-                                    </div>
-                                    
-                                    {!isRolling && (
-                                        <div className="absolute -bottom-4 md:-bottom-6 bg-orange-500 text-white px-4 py-1.5 rounded-full text-base md:text-xl font-bold shadow-lg animate-bounce whitespace-nowrap">
-                                            點我擲骰子
-                                        </div>
-                                    )}
-                                </button>
-                            </div>
-
-                            {/* 格子渲染 */}
-                            {BOARD_DATA.map((tile, index) => {
-                                const pos = getGridPosition(index);
-                                const teamsHere = teams.filter(t => t.position === index);
-                                const IconComponent = tile.icon; // 取得 Lucide Icon 元件
-                                
-                                return (
-                                    <div 
-                                        key={tile.id} 
-                                        style={{ gridRow: pos.row, gridColumn: pos.col }}
-                                        className={`
-                                            relative rounded-xl md:rounded-2xl border-b-4 border-r-4 shadow-md flex flex-col items-center justify-center text-center transition-all
-                                            ${tile.color} border-black/20
-                                        `}
-                                    >
-                                        <div className="flex flex-col items-center justify-center h-full w-full p-1">
-                                            <div className="mb-1 drop-shadow-md transform scale-90 md:scale-110">
-                                                <IconComponent className="w-8 h-8 md:w-10 md:h-10 text-white" />
-                                            </div>
-                                            <div className="text-white font-black text-base md:text-2xl lg:text-3xl leading-none drop-shadow-md tracking-wide">
-                                                {tile.label}
-                                            </div>
-                                        </div>
-
-                                        <div className="absolute top-1 left-2 text-white/40 font-black text-xs md:text-lg">
-                                            {index + 1}
-                                        </div>
-
-                                        {teamsHere.length > 0 && (
-                                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
-                                                {/* 隊伍圖示 (已放大) */}
-                                                <div className="flex -space-x-8 md:-space-x-12 bg-white/30 p-4 rounded-full backdrop-blur-sm shadow-xl border-2 border-white/50">
-                                                    {teamsHere.map(t => (
-                                                        <div key={t.id} className={`w-20 h-20 md:w-28 md:h-28 rounded-full border-4 border-white shadow-2xl flex items-center justify-center text-3xl md:text-5xl font-black text-white ${t.color.bg}`}>
-                                                            {t.name[0]}
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </main>
-
-                    {/* 任務彈窗 */}
-                    {gameState === 'MODAL' && currentTask && (
-                        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-md animate-in fade-in duration-300">
-                            <div className={`bg-white rounded-[2.5rem] shadow-2xl max-w-4xl w-full h-auto max-h-[90vh] flex flex-col overflow-hidden border-8 ${currentTask.type === 'ATTACK' ? 'border-red-500' : 'border-white'}`}>
-                                
-                                {/* 彈窗標題列：攻擊卡顯示紅色 */}
-                                <div className={`${currentTask.type === 'ATTACK' ? 'bg-red-600' : (currentTask.teamColor ? currentTask.teamColor.bg : 'bg-gray-600')} p-8 text-white text-center shrink-0 shadow-md z-10`}>
-                                    <div className="text-3xl font-bold opacity-90 mb-2">{currentTask.teamName}</div>
-                                    <div className="text-6xl font-black tracking-widest drop-shadow-lg flex items-center justify-center gap-4">
-                                        {currentTask.type === 'ATTACK' && <Flame className="w-16 h-16 animate-pulse" />}
-                                        {currentTask.title}
-                                        {currentTask.type === 'ATTACK' && <Flame className="w-16 h-16 animate-pulse" />}
-                                    </div>
-                                </div>
-                                
-                                <div className="p-10 flex-1 flex flex-col items-center justify-center text-center overflow-y-auto bg-yellow-50">
-                                    <div className="w-full bg-white p-8 rounded-3xl shadow-sm border-4 border-yellow-200 mb-8">
-                                        <p className="text-5xl md:text-6xl font-black text-gray-800 leading-tight">
-                                            {currentTask.content}
-                                        </p>
-                                        
-                                        {currentTask.answer && (
-                                            <div className="mt-8 pt-8 border-t-4 border-dashed border-gray-200">
-                                                <details className="group">
-                                                    <summary className="cursor-pointer text-2xl text-blue-500 font-bold list-none p-4 hover:bg-blue-50 rounded-xl transition-colors">
-                                                        點這裡看答案
-                                                    </summary>
-                                                    <p className="mt-4 text-4xl font-bold text-green-600 bg-green-50 p-4 rounded-xl">{currentTask.answer}</p>
-                                                </details>
-                                            </div>
-                                        )}
-                                    </div>
-                                    
-                                    <div className={`text-4xl font-black px-8 py-2 rounded-full shadow-sm border-2 ${currentTask.type === 'ATTACK' ? 'text-red-600 bg-red-50 border-red-200' : 'text-orange-500 bg-white border-orange-100'}`}>
-                                        {currentTask.type === 'ATTACK' ? '💥 攻擊效果 💥' : `獎勵：${currentTask.points} 分`}
-                                    </div>
-                                </div>
-                                
-                                <div className="p-6 bg-white border-t flex gap-4 shrink-0">
-                                    {currentTask.type === 'REST' ? (
-                                        <button onClick={() => completeTask(true)} className="flex-1 bg-green-500 text-white text-3xl font-bold py-6 rounded-2xl shadow-lg active:scale-95 transition-transform">
-                                            休息好了 (領取分數)
-                                        </button>
-                                    ) : currentTask.type === 'ATTACK' ? (
-                                        // 攻擊卡只有一個按鈕
-                                        <button onClick={() => completeTask(true)} className="flex-1 bg-red-600 hover:bg-red-700 text-white text-4xl font-bold py-6 rounded-2xl shadow-lg active:scale-95 transition-transform flex items-center justify-center gap-3">
-                                            <Swords className="w-10 h-10" />
-                                            發動攻擊！
-                                        </button>
-                                    ) : (
-                                        <>
-                                            <button onClick={() => completeTask(false)} className="flex-1 bg-gray-400 text-white text-3xl font-bold py-6 rounded-2xl shadow active:scale-95 transition-transform">
-                                                放棄 / 失敗
-                                            </button>
-                                            <button onClick={() => completeTask(true)} className="flex-[2] bg-green-600 text-white text-4xl font-bold py-6 rounded-2xl shadow-lg active:scale-95 transition-transform flex items-center justify-center gap-3">
-                                                <CheckCircle className="w-10 h-10" />
-                                                任務完成
-                                            </button>
-                                        </>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {showConfetti && (
-                        <div className="fixed inset-0 pointer-events-none z-[60] flex items-center justify-center">
-                            <div className={`text-6xl md:text-8xl animate-bounce font-black drop-shadow-[0_4px_0_rgba(0,0,0,0.2)] bg-white border-8 px-12 py-8 rounded-full shadow-2xl text-center leading-tight ${confettiText.includes('扣分') ? 'text-red-600 border-red-500' : 'text-yellow-500 border-yellow-400'}`}>
-                                {confettiText}
-                            </div>
-                        </div>
-                    )}
+  if (gameState === 'FINISHED') {
+    const sortedTeams = [...teams].sort((a, b) => b.score - a.score);
+    return (
+      <div className="min-h-screen bg-yellow-100 flex flex-col items-center justify-center p-4 font-sans">
+        <div className="bg-white p-8 rounded-3xl shadow-2xl max-w-4xl w-full text-center">
+          <h2 className="text-5xl font-black text-gray-800 mb-10">🏆 排行榜 🏆</h2>
+          <div className="space-y-6 mb-12">
+            {sortedTeams.map((team, index) => (
+              <div key={team.id} className={`flex items-center p-6 rounded-2xl border-4 ${index === 0 ? 'bg-yellow-50 border-yellow-400 scale-105 shadow-xl' : 'bg-white border-gray-200'}`}>
+                <div className={`w-20 h-20 rounded-full flex items-center justify-center text-4xl font-black text-white mr-6 ${index === 0 ? 'bg-yellow-400' : 'bg-gray-400'}`}>
+                  {index + 1}
                 </div>
-            );
-        }
-        
-        // 4. 渲染應用程式 (修正為 React 18 的 createRoot API)
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<ElderMonopoly />);
+                <div className="flex-1 text-left">
+                  <div className={`text-4xl font-black ${team.color.text}`}>{team.name}</div>
+                </div>
+                <div className="text-6xl font-black text-gray-800">{team.score} <span className="text-3xl font-bold text-gray-500">分</span></div>
+              </div>
+            ))}
+          </div>
+          <button 
+            onClick={resetGame}
+            className="bg-blue-600 text-white text-3xl font-bold py-6 px-16 rounded-full hover:bg-blue-700 shadow-xl"
+          >
+            再玩一次
+          </button>
+        </div>
+      </div>
+    );
+  }
 
-    </script>
-</body>
-</html>
+  const currentTeam = teams[currentTeamIndex];
+
+  return (
+    <div className="h-screen w-screen bg-green-50 flex flex-col overflow-hidden font-sans select-none">
+      
+      {/* 頂部 */}
+      <header className="bg-white shadow-md p-2 flex justify-between items-center z-20 h-24 shrink-0">
+        <div className="flex items-center gap-4 pl-4">
+          <Activity className="text-orange-600 w-12 h-12" />
+          <h1 className="text-4xl font-black text-gray-800 tracking-wide hidden md:block">長者運動大富翁</h1>
+        </div>
+        <div className="flex gap-6 pr-4 items-center">
+             {teams.map((team) => (
+                 <div key={team.id} className={`hidden md:flex flex-col items-center px-6 py-2 rounded-2xl border-4 ${team.color.bg} border-white shadow-md min-w-[140px]`}>
+                    <span className="text-2xl text-white font-bold mb-1">{team.name}</span>
+                    <span className="text-5xl font-black text-white leading-none drop-shadow-md">{team.score}</span>
+                 </div>
+             ))}
+            <button onClick={endGame} className="ml-2 px-8 py-4 bg-gray-200 rounded-full text-2xl text-gray-700 font-black hover:bg-gray-300 shadow-sm border-4 border-gray-300 transition-transform active:scale-95">
+            結束
+            </button>
+        </div>
+      </header>
+
+      {/* 主畫面 */}
+      <main className="flex-1 relative flex items-center justify-center bg-green-100/50 p-2 md:p-4 overflow-hidden">
+        
+        <div className="relative aspect-square h-full max-h-[calc(100vh-5rem)] w-auto grid grid-cols-6 grid-rows-6 gap-2 md:gap-3 p-3 bg-white rounded-[2rem] shadow-2xl border-8 border-green-200">
+            
+            {/* 中央控制區 */}
+            <div className="col-start-2 col-span-4 row-start-2 row-span-4 bg-yellow-50/50 rounded-3xl flex flex-col items-center justify-center z-10 relative">
+               
+               <div className="flex flex-col items-center mb-3 md:mb-6 animate-in fade-in zoom-in duration-500">
+                   <div className="text-lg md:text-2xl font-bold text-gray-500 mb-1">現在輪到</div>
+                   <div className={`px-8 py-3 rounded-full text-4xl md:text-6xl font-black text-white shadow-lg tracking-widest ${currentTeam.color.bg} border-4 border-white`}>
+                       {currentTeam.name}
+                   </div>
+               </div>
+
+               <button 
+                onClick={rollDice}
+                disabled={isRolling}
+                className={`
+                  relative group w-36 h-36 md:w-52 md:h-52 flex items-center justify-center rounded-[2rem] shadow-[0_12px_24px_rgba(0,0,0,0.15)] transition-all duration-200
+                  ${isRolling ? 'bg-gray-100 cursor-not-allowed scale-95' : 'bg-white hover:scale-105 cursor-pointer hover:shadow-[0_16px_32px_rgba(0,0,0,0.2)]'}
+                  border-4 md:border-8 border-orange-100
+                `}
+              >
+                 <div className={`
+                    w-24 h-24 md:w-36 md:h-36 bg-white border-[4px] md:border-[6px] border-gray-800 rounded-2xl flex items-center justify-center shadow-inner
+                    ${isRolling ? 'animate-spin' : ''}
+                 `}>
+                     <span className={`text-6xl md:text-8xl font-black ${isRolling ? 'text-gray-300 blur-sm' : 'text-gray-800'}`}>
+                        {diceNumber}
+                     </span>
+                 </div>
+                 
+                 {!isRolling && (
+                     <div className="absolute -bottom-4 md:-bottom-6 bg-orange-500 text-white px-4 py-1.5 rounded-full text-base md:text-xl font-bold shadow-lg animate-bounce whitespace-nowrap">
+                         點我擲骰子
+                     </div>
+                 )}
+              </button>
+            </div>
+
+            {/* 格子渲染 */}
+            {BOARD_DATA.map((tile, index) => {
+              const pos = getGridPosition(index);
+              const teamsHere = teams.filter(t => t.position === index);
+              
+              return (
+                <div 
+                  key={tile.id} 
+                  style={{ gridRow: pos.row, gridColumn: pos.col }}
+                  className={`
+                    relative rounded-xl md:rounded-2xl border-b-4 border-r-4 shadow-md flex flex-col items-center justify-center text-center transition-all
+                    ${tile.color} border-black/20
+                  `}
+                >
+                  <div className="flex flex-col items-center justify-center h-full w-full p-1">
+                      <div className="mb-1 drop-shadow-md transform scale-90 md:scale-110">
+                        {tile.icon}
+                      </div>
+                      <div className="text-white font-black text-base md:text-2xl lg:text-3xl leading-none drop-shadow-md tracking-wide">
+                        {tile.label}
+                      </div>
+                  </div>
+
+                  <div className="absolute top-1 left-2 text-white/40 font-black text-xs md:text-lg">
+                    {index + 1}
+                  </div>
+
+                  {teamsHere.length > 0 && (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
+                       {/* 調整：放大隊伍圖示尺寸，並調整間距 */}
+                       <div className="flex -space-x-8 md:-space-x-12 bg-white/30 p-4 rounded-full backdrop-blur-sm shadow-xl border-2 border-white/50">
+                        {teamsHere.map(t => (
+                          <div key={t.id} className={`w-20 h-20 md:w-28 md:h-28 rounded-full border-4 border-white shadow-2xl flex items-center justify-center text-3xl md:text-5xl font-black text-white ${t.color.bg}`}>
+                            {t.name[0]}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+        </div>
+      </main>
+
+      {/* 任務彈窗 */}
+      {gameState === 'MODAL' && currentTask && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-md animate-in fade-in duration-300">
+          <div className={`bg-white rounded-[2.5rem] shadow-2xl max-w-4xl w-full h-auto max-h-[90vh] flex flex-col overflow-hidden border-8 ${currentTask.type === 'ATTACK' ? 'border-red-500' : 'border-white'}`}>
+            
+            {/* 彈窗標題列：攻擊卡顯示紅色 */}
+            <div className={`${currentTask.type === 'ATTACK' ? 'bg-red-600' : (currentTask.teamColor ? currentTask.teamColor.bg : 'bg-gray-600')} p-8 text-white text-center shrink-0 shadow-md z-10`}>
+              <div className="text-3xl font-bold opacity-90 mb-2">{currentTask.teamName}</div>
+              <div className="text-6xl font-black tracking-widest drop-shadow-lg flex items-center justify-center gap-4">
+                 {currentTask.type === 'ATTACK' && <Flame className="w-16 h-16 animate-pulse" />}
+                 {currentTask.title}
+                 {currentTask.type === 'ATTACK' && <Flame className="w-16 h-16 animate-pulse" />}
+              </div>
+            </div>
+            
+            <div className="p-10 flex-1 flex flex-col items-center justify-center text-center overflow-y-auto bg-yellow-50">
+              <div className="w-full bg-white p-8 rounded-3xl shadow-sm border-4 border-yellow-200 mb-8">
+                  <p className="text-5xl md:text-6xl font-black text-gray-800 leading-tight">
+                    {currentTask.content}
+                  </p>
+                  
+                  {currentTask.answer && (
+                    <div className="mt-8 pt-8 border-t-4 border-dashed border-gray-200">
+                      <details className="group">
+                        <summary className="cursor-pointer text-2xl text-blue-500 font-bold list-none p-4 hover:bg-blue-50 rounded-xl transition-colors">
+                            點這裡看答案
+                        </summary>
+                        <p className="mt-4 text-4xl font-bold text-green-600 bg-green-50 p-4 rounded-xl">{currentTask.answer}</p>
+                      </details>
+                    </div>
+                  )}
+              </div>
+              
+              <div className={`text-4xl font-black px-8 py-2 rounded-full shadow-sm border-2 ${currentTask.type === 'ATTACK' ? 'text-red-600 bg-red-50 border-red-200' : 'text-orange-500 bg-white border-orange-100'}`}>
+                 {currentTask.type === 'ATTACK' ? '💥 攻擊效果 💥' : `獎勵：${currentTask.points} 分`}
+              </div>
+            </div>
+            
+            <div className="p-6 bg-white border-t flex gap-4 shrink-0">
+               {currentTask.type === 'REST' ? (
+                   <button onClick={() => completeTask(true)} className="flex-1 bg-green-500 text-white text-3xl font-bold py-6 rounded-2xl shadow-lg active:scale-95 transition-transform">
+                   休息好了 (領取分數)
+                 </button>
+               ) : currentTask.type === 'ATTACK' ? (
+                  // 攻擊卡只有一個按鈕
+                  <button onClick={() => completeTask(true)} className="flex-1 bg-red-600 hover:bg-red-700 text-white text-4xl font-bold py-6 rounded-2xl shadow-lg active:scale-95 transition-transform flex items-center justify-center gap-3">
+                    <Swords className="w-10 h-10" />
+                    發動攻擊！
+                  </button>
+               ) : (
+                 <>
+                  <button onClick={() => completeTask(false)} className="flex-1 bg-gray-400 text-white text-3xl font-bold py-6 rounded-2xl shadow active:scale-95 transition-transform">
+                    放棄 / 失敗
+                  </button>
+                  <button onClick={() => completeTask(true)} className="flex-[2] bg-green-600 text-white text-4xl font-bold py-6 rounded-2xl shadow-lg active:scale-95 transition-transform flex items-center justify-center gap-3">
+                    <CheckCircle className="w-10 h-10" />
+                    任務完成
+                  </button>
+                 </>
+               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showConfetti && (
+        <div className="fixed inset-0 pointer-events-none z-[60] flex items-center justify-center">
+             <div className={`text-6xl md:text-8xl animate-bounce font-black drop-shadow-[0_4px_0_rgba(0,0,0,0.2)] bg-white border-8 px-12 py-8 rounded-full shadow-2xl text-center leading-tight ${confettiText.includes('扣分') ? 'text-red-600 border-red-500' : 'text-yellow-500 border-yellow-400'}`}>
+                {confettiText}
+             </div>
+        </div>
+      )}
+    </div>
+  );
+}
